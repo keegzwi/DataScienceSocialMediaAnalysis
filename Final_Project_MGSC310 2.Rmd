@@ -1,0 +1,152 @@
+---
+title: "[Final Project]"
+author: "[Will Keegan]"
+subtitle: MGSC 310 Problem Set Template
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+
+# Please leave this code chunk as is. It makes some slight formatting changes to alter the output to be more aesthetically pleasing. 
+
+library(knitr)
+
+# Change the number in set seed to your own favorite number
+set.seed(1818)
+options(width=70)
+options(scipen=99)
+
+
+# this sets text outputted in code chunks to small
+opts_chunk$set(tidy.opts=list(width.wrap=50),tidy=TRUE, size = "vsmall")  
+opts_chunk$set(message = FALSE,                                          
+               warning = FALSE,
+               # "caching" stores objects in code chunks and only rewrites if you change things
+               cache = FALSE,                               
+               # automatically downloads dependency files
+               autodep = TRUE,
+               # 
+               cache.comments = FALSE,
+               # 
+               collapse = TRUE,
+               # change fig.width and fig.height to change the code height and width by default
+               fig.width = 5.5,  
+               fig.height = 4.5,
+               fig.align='center')
+
+
+```
+
+```{r setup-2}
+
+# Always print this out before your assignment
+sessionInfo()
+getwd()
+
+```
+
+
+<!-- ### start answering your problem set here -->
+<!-- You may export your homework in either html or pdf, with the former usually being easier. 
+     To export or compile your Rmd file: click above on 'Knit' then 'Knit to HTML' -->
+<!-- Be sure to submit both your .Rmd file and the compiled .html or .pdf file for full credit -->
+
+
+```{r setup-3}
+
+# load all your libraries in this chunk 
+library('tidyverse')
+# note, do not run install.packages() inside a code chunk. install them in the console outside of a code chunk. 
+
+
+
+```
+
+
+
+## Question 1
+
+1a) Text response to part a. 
+
+```{r}
+library(readr)
+library(glmnet)
+library(coefplot)
+social_data <- read_csv("/Users/willkeegan/Desktop/MGSC_310/Final_Project/sentimentdataset.csv")
+head(social_data)
+str(social_data)
+
+# Summarize the data
+summary(social_data)
+colnames(social_data)
+str(social_data$Likes)
+# code for part a
+
+
+
+```
+
+
+1b) Response to part b. 
+
+```{r}
+library(text)
+library(sentimentr)
+library(glmnet)
+library(caret)
+library(dplyr)
+library(coefplot)
+
+#Create a copy of the dataset for feature engineering
+social_data_fe <- social_data
+
+#Check for missing values and remove rows with any missing values
+social_data_fe <- na.omit(social_data_fe)
+
+#Perform sentiment analysis on Hashtags using sentimentr package
+sentiment_scores <- sentimentr::sentiment_by(social_data_fe$Hashtags)
+
+#Categorize hashtags into positive and negative sentiment groups
+social_data_fe$SentimentPositive <- ifelse(sentiment_scores$ave_sentiment > 0, 1, 0)
+social_data_fe$SentimentNegative <- ifelse(sentiment_scores$ave_sentiment <= 0, 1, 0)
+
+#Create HourSlot based on military time
+social_data_fe$HourSlot <- cut(social_data_fe$Hour, breaks = c(0, 4, 8, 12, 16, 20, 24), labels = c(1, 2, 3, 4, 5, 6), include.lowest = TRUE)
+
+#Convert Month to factor
+social_data_fe$Month <- factor(social_data_fe$Month)
+
+#Create one-hot encoding for Month
+month_encoded <- model.matrix(~Month - 1, data = social_data_fe)
+
+#Create design matrix using model.matrix
+X_fe <- model.matrix(Likes ~ Platform + SentimentPositive + SentimentNegative + HourSlot + Day + Year - 1, data = social_data_fe)
+#Combine one-hot encoding with existing design matrix
+X_fe <- cbind(X_fe, month_encoded)
+
+#Standardize features
+X_fe_scaled <- scale(X_fe)
+
+#Response variable
+y_fe <- social_data_fe$Likes
+
+#Perform ridge regression on the updated dataset with feature engineering
+ridge_mod_fe <- cv.glmnet(X_fe_scaled, y_fe, alpha = 0)  # alpha = 0 for ridge regression
+
+#Print the coefficients
+print(coef(ridge_mod_fe, s = "lambda.min"))
+
+#Plot coefficient paths
+plot(ridge_mod_fe)
+coefplot(ridge_mod_fe, main = "Ridge Coefficient Paths")
+
+#Print cross-validated results
+print(ridge_mod_fe)
+coefpath(ridge_mod_fe)
+
+
+
+```
